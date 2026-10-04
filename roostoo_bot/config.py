@@ -94,6 +94,4 @@ class Config:
         if not (cfg.initial_cash > 0 and 0.001 <= cfg.fee_reserve <= 0.05 and
                 0 <= cfg.paper_fee <= cfg.fee_reserve and cfg.poll_seconds >= 4):
             raise ValueError("invalid cash, fees, reserve or polling interval")
-        if mode == "competition" and cfg.end_at is None:
-            raise ValueError("competition mode requires the organizer-confirmed COMPETITION_END_UTC")
         return cfg

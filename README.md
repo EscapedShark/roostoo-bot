@@ -78,12 +78,12 @@ ROOSTOO_SECRET_KEY=<competition API secret>
 STRATEGY_VARIANT=protected
 RANK_EXIT_DAYS=1
 STRUCTURE_EXIT_DAYS=1
-COMPETITION_END_UTC=<organizer-confirmed end time, e.g. YYYY-MM-DDTHH:MM:SS+00:00>
+COMPETITION_END_UTC=
 ```
 
 Save with `Ctrl+O`, `Enter`, then exit with `Ctrl+X`.
 
-> **Get `COMPETITION_END_UTC` right before the first start.** It is part of the account fingerprint stored on first launch, together with the key, strategy variant and parameters. Changing any of them later makes the bot refuse to start (`saved account/config fingerprint differs`). The bot stops sending orders at this time; Roostoo performs the final liquidation.
+> Leave `COMPETITION_END_UTC` empty to keep trading until the competition closes; Roostoo performs the final liquidation. If you set it (e.g. `YYYY-MM-DDTHH:MM:SS+00:00`), the bot stops sending orders at that time. The key, strategy variant, parameters and this value form the account fingerprint stored on first launch; changing any of them later makes the bot refuse to start (`saved account/config fingerprint differs`).
 
 Then run the read-only live check:
 
@@ -106,7 +106,7 @@ sudo systemctl enable --now roostoo-bot
 sudo systemctl status roostoo-bot --no-pager
 ```
 
-`enable` starts the bot again after an instance reboot; `Restart=on-failure` restarts it 10 seconds after a crash. A normal exit at `COMPETITION_END_UTC` is not restarted. The mode comes from `BOT_MODE` in `.env`. Do not also start the bot in tmux; a lock file allows only one process per state directory.
+`enable` starts the bot again after an instance reboot; `Restart=on-failure` restarts it 10 seconds after a crash. A normal exit at a configured `COMPETITION_END_UTC` is not restarted. The mode comes from `BOT_MODE` in `.env`. Do not also start the bot in tmux; a lock file allows only one process per state directory.
 
 ### 5. Monitor
 
@@ -202,7 +202,7 @@ The balance client accepts both the live service's `SpotWallet` and the legacy d
 
 Finish warmup before a cold start near UTC 00:00 or the 4-hour checks. While market data refreshes, protection checks for held positions continue; incomplete data or late processing blocks new entries. Protective sells cannot run during long downtime; if missed candles for a held position are unavailable, later closed-bar decisions pause while intrabar protection continues. The first recovery must keep the full state and candle cache.
 
-Competition mode requires the organizer-confirmed `COMPETITION_END_UTC`. The bot stops sending orders at that time and Roostoo liquidates according to the official rules; because published schedules conflict, no date is guessed. The CPI calendar of the original strategy is frozen up to 2026-10-14; later stages should check the calendar through an allowed code update.
+`COMPETITION_END_UTC` is optional. Left empty, the bot keeps running and Roostoo liquidates at the end according to the official rules; when set, the bot stops sending orders at that time. The CPI calendar of the original strategy is frozen up to 2026-10-14; later stages should check the calendar through an allowed code update.
 
 ## Official references
 

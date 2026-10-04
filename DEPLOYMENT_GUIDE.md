@@ -154,16 +154,16 @@ tmux new -s roostoo-test
 
 ## 7. 转正式比赛账户
 
-测试账户完成实际成交验证后，使用 **主赛阶段**密钥，并填入主办方最终通知的截止时间：
+测试账户完成实际成交验证后，使用 **主赛阶段**密钥：
 
 ```dotenv
 BOT_MODE=competition
 ROOSTOO_API_KEY=填入主赛API_KEY
 ROOSTOO_SECRET_KEY=填入主赛SECRET_KEY
-COMPETITION_END_UTC=主办方确认的带时区ISO时间
+COMPETITION_END_UTC=
 ```
 
-例如 ISO 格式为 `YYYY-MM-DDTHH:MM:SS+00:00`；示例不代表实际比赛截止日期。FAQ 与说明会资料的起止时间存在冲突，本程序不猜填。缺少截止时间会拒绝正式模式启动。
+`COMPETITION_END_UTC` 可留空：机器人持续运行，比赛结束后由 Roostoo 统一清仓。如需到点停止发单，可填带时区的 ISO 时间（如 `YYYY-MM-DDTHH:MM:SS+00:00`）；该值在首次启动时写入账户指纹，之后不能修改。
 
 ```bash
 python bot.py check --mode competition
@@ -173,7 +173,7 @@ tmux new -s roostoo-main
 
 正式模式保存到 `state/competition.sqlite`，独立于测试及观察模式。使用新阶段密钥时同样使用独立的完整 `STATE_DIR`，保留旧状态供审计。不要同时从多台机器使用同一组账户密钥。
 
-比赛进行后保持机器人自主运行，不能根据盘面临时停机、手动覆盖决策或手动下单。代码更新应保留明确 Git 提交和评审依据。系统在配置的截止时间停止发送订单，最终清仓由 Roostoo 处理。来源：[官方 FAQ](https://roostoo.notion.site/Roostoo-Quant-Trading-Hackathon-Official-FAQ-313ba22fed798042bab7c93c609d004e)。
+比赛进行后保持机器人自主运行，不能根据盘面临时停机、手动覆盖决策或手动下单。代码更新应保留明确 Git 提交和评审依据。最终清仓由 Roostoo 处理；若配置了 `COMPETITION_END_UTC`，系统到时停止发送订单。来源：[官方 FAQ](https://roostoo.notion.site/Roostoo-Quant-Trading-Hackathon-Official-FAQ-313ba22fed798042bab7c93c609d004e)。
 
 ## 8. 可选：systemd 自动恢复
 
@@ -181,7 +181,7 @@ tmux new -s roostoo-main
 
 1. 将模板中 `YOUR_LINUX_USERNAME` 替换为 `whoami` 的结果。
 2. 将 `WorkingDirectory` 和 `ExecStart` 改为实际路径。
-3. `.env` 的 `BOT_MODE` 控制服务模式；确保使用正确阶段的密钥和截止时间。
+3. `.env` 的 `BOT_MODE` 控制服务模式；确保使用正确阶段的密钥。
 4. 避免同时通过 tmux 启动同一目录的机器人。
 
 ```bash
@@ -192,7 +192,7 @@ sudo systemctl status roostoo-bot --no-pager
 sudo journalctl -u roostoo-bot -n 30 --no-pager
 ```
 
-服务设置 `Restart=on-failure`，已达到比赛截止时间正常退出时不会重启。状态存放在部署目录而非临时目录。
+服务设置 `Restart=on-failure`，到达已配置的 `COMPETITION_END_UTC` 正常退出时不会重启。状态存放在部署目录而非临时目录。
 
 ## 9. 恢复和保存审计
 
@@ -218,4 +218,4 @@ PY
 
 备份文件和审计日志应单独保存，不公开密钥或账户私密数据。运行中不可只复制数据库主文件而遗漏 WAL；恢复时同时保留行情缓存或重新预热。
 
-此次已完成本地部署版本、公开与私有接口检查、观察运行、测试账户实际买卖及重启对账，AWS 准备已由你完成。**机器人在服务器上的安装、预热、账户状态迁移和持续运行仍需执行；主赛模式还需要主赛密钥与主办方确认的截止时间。**
+此次已完成本地部署版本、公开与私有接口检查、观察运行、测试账户实际买卖及重启对账，AWS 准备已由你完成。**机器人在服务器上的安装、预热、账户状态迁移和持续运行仍需执行；主赛模式还需要主赛密钥。**

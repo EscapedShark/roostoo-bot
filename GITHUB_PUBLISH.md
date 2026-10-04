@@ -55,4 +55,4 @@ git log -1 --oneline
 
 同一组 General Portfolio 测试密钥已经有两笔成交。上云继续使用前，必须恢复本机 `state/test-account-transfer.sh` 中的账本；密钥在服务器单独配置，行情缓存可以重新预热。单独保存迁移脚本并通过 Session Manager 传入，不加入 GitHub。
 
-测试账户运行成功后再进入主赛配置：使用主赛密钥，并填写主办方确认的 `COMPETITION_END_UTC`。GitHub 推送成功不代表云端机器人已经启动。
+测试账户运行成功后再进入主赛配置：使用主赛密钥；`COMPETITION_END_UTC` 可留空。GitHub 推送成功不代表云端机器人已经启动。
