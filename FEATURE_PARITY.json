@@ -1,0 +1,44 @@
+[
+  {
+    "symbol": "BTCUSDT",
+    "closed_hours": 3672,
+    "end_utc": "2026-10-01T00:00:00+00:00",
+    "feature_columns": [
+      "ret7d",
+      "ret72",
+      "liq24",
+      "chan",
+      "zone",
+      "wyckoff"
+    ],
+    "matched": true
+  },
+  {
+    "symbol": "ETHUSDT",
+    "closed_hours": 3672,
+    "end_utc": "2026-10-01T00:00:00+00:00",
+    "feature_columns": [
+      "ret7d",
+      "ret72",
+      "liq24",
+      "chan",
+      "zone",
+      "wyckoff"
+    ],
+    "matched": true
+  },
+  {
+    "symbol": "NEARUSDT",
+    "closed_hours": 3672,
+    "end_utc": "2026-10-01T00:00:00+00:00",
+    "feature_columns": [
+      "ret7d",
+      "ret72",
+      "liq24",
+      "chan",
+      "zone",
+      "wyckoff"
+    ],
+    "matched": true
+  }
+]

@@ -1,0 +1,20 @@
+[Unit]
+Description=Roostoo autonomous trading bot
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# 替换为 whoami 返回的用户，以及实际部署路径。
+User=YOUR_LINUX_USERNAME
+WorkingDirectory=/home/YOUR_LINUX_USERNAME/roostoo-bot
+ExecStart=/home/YOUR_LINUX_USERNAME/roostoo-bot/.venv/bin/python -u bot.py run
+Restart=on-failure
+RestartSec=10
+UMask=0077
+Environment=PYTHONUNBUFFERED=1
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

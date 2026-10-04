@@ -1,0 +1,19 @@
+{
+  "source": "../策略/roostoo_chan_wyckoff",
+  "copied_at_utc": "2026-10-04",
+  "files": {
+    "competition_strategy.py": "76db2228a520e106240b8ef978659a53aff0fac444168958a81ab2d67c373880",
+    "protected_strategy.py": "95cd534b6e2eddcb0d1ed6cbd37af68138fb0f386939b2ae47c85ab1704f7a61",
+    "backtest.py": "aafee1b85db661a57feda4d23df16ad649911c518c7a74554fda263bf4459adb",
+    "download_v2_data.py": "177b434c18bb7e84e2213edb9eea69780a75f79cd8d219852abc29432a868abf",
+    "download_data.py": "2c9af7a63df9f5cb9dd70fc0da6cffe8aa3fe6abf9c0690d669e6ddc2eebee6d",
+    "rolling_screen.py": "a3f3cadab14433a00656bccfe7a7942e18b2a8341bd3b3639442cd597b1d13d6",
+    "portfolio_screen.py": "e43220e8d8e749171c67a101f04b9a86fb3dfe2a596ef92372e019dc8d31837e",
+    "trail_core.py": "b9eacc254fd7c99962498f48a2a1c3215f673bdb2c9348aab9aa7db531b9f7ac",
+    "research_v2.py": "c498f8e528c85b83f9c7488b3f9d811fb139e2abffaa6c134131351f407dd0cd",
+    "guarded_core_screen.py": "7b1a28f10dc2ad1a26cdc89f30e076c935c0a8cc4aa25956bcae7b3184d2de2c",
+    "download_stock_data.py": "6bce7dbbdc9739d2b83d96251a2e6ca48b9cb1d4a6bf741a3dee2f205c868ebc",
+    "guarded_validation.py": "1327ccf2c34da94b48c8d1629a043d659e692ad0e334d34a1272ae16c704d5e9",
+    "slow_rolling_screen.py": "c60294cc4d883b57d74bfbcf4f09ec27c68c66a6ffdbc29a6193edb17a0eb959"
+  }
+}
