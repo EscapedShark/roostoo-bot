@@ -1,14 +1,14 @@
-# Roostoo 策略部署版
+# Roostoo Trading Bot (Deployment Build)
 
-代码仓库：[EscapedShark/roostoo-bot](https://github.com/EscapedShark/roostoo-bot)。
+Repository: [EscapedShark/roostoo-bot](https://github.com/EscapedShark/roostoo-bot).
 
-这是本地研究目录 `策略/roostoo_chan_wyckoff/` 的独立部署版本：保留原始策略，补上在线行情、Roostoo 执行、分账、成交恢复和运行入口。本目录内容就是 GitHub 仓库根目录。上传步骤见 [GITHUB_PUBLISH.md](GITHUB_PUBLISH.md)，固定信号说明见 [STRATEGY.md](STRATEGY.md)，AWS 运行步骤见 [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)。
+This is the standalone deployment build of the local research project `策略/roostoo_chan_wyckoff/`. It keeps the original strategy unchanged and adds the live layer around it: market data feed, Roostoo execution, capital sleeves, fill recovery and a run entry point. This directory is the repository root. The fixed signal rules are described in [STRATEGY.md](STRATEGY.md); additional notes (in Chinese) are in [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) and [GITHUB_PUBLISH.md](GITHUB_PUBLISH.md).
 
-**默认 `observe`：读取真实公开行情，使用本地模拟资金与模拟成交，不发送交易请求。** `test` 和 `competition` 会使用对应密钥真实调用 Roostoo 模拟交易账户。模式名称无法验证密钥属于哪个比赛阶段，需使用主办方发给该阶段的密钥。
+**The default mode is `observe`: it reads real public market data, trades simulated cash with simulated fills, and never sends an order.** `test` and `competition` call the Roostoo mock exchange with real API keys and do place orders. The bot cannot tell which competition stage a key belongs to, so always use the key the organizers issued for that stage.
 
-## 快速运行
+## Quick start
 
-使用 Python 3.11 或 3.12。在本目录执行：
+Use Python 3.11 or 3.12. From this directory:
 
 ```bash
 python3.11 -m venv .venv
@@ -23,73 +23,191 @@ python bot.py run --mode observe --once
 ./run.sh --mode observe
 ```
 
-`run --once` 会按选择的模式处理一次新收盘边界；在真实下单模式使用时，也可能发送订单。重复运行已处理过的边界不会重复下单，会等待下一个边界。冷启动时距收盘超过 30 秒会暂停新仓，等待下一次合格的决策窗口。
-
-## 策略配置
-
-默认 `STRATEGY_VARIANT=protected`、`RANK_EXIT_DAYS=1`、`STRUCTURE_EXIT_DAYS=1`。这沿用原 `protected_strategy.py` 的默认全套保护：CPI、12% 账户回撤、盘中止损、新仓价差及波动检查。它与研究报告中的“仅 CPI”实验不同。
-
-选择 `baseline` 使用原冻结策略的收盘信号，不启用 CPI、账户回撤及盘中止损。执行层仍要求可信数据、报价、余额和及时处理。`2/2` 是研究中的滞后确认参数；本部署没有根据收益重新选择参数。配置和账户指纹写入状态，恢复时必须匹配。
-
-资金首次按 BTC 20%、山寨币 80% 分成两腿；两腿现金、持仓、手续费各自滚动。山寨币新仓目标为该腿当时净值的 50%，最多两项可交易持仓；保留仓位不重新配平。买单预留默认 0.5% 的费用与价格变化空间，数量向下取整，所以实际投入略低于意向目标。
-
-## 模块
-
-| 文件 | 职责 |
+| Command | What it does |
 | --- | --- |
-| `bot.py` / `run.sh` | 入口与持续运行。 |
-| `roostoo_bot/config.py` | 配置、账户及策略指纹；默认观察模式。 |
-| `roostoo_bot/feed.py` | Binance 完整 1h/15m K 线、历史预热、连续性检查、特征。 |
-| `roostoo_bot/api.py` | Roostoo 签名、服务器时间、公开和私有接口、持久化限流。 |
-| `roostoo_bot/store.py` | SQLite 分账、状态、订单日志和累计成交差额。 |
-| `roostoo_bot/execution.py` | 数量换算、先卖后买、恢复查单、余额核对。 |
-| `roostoo_bot/runner.py` | UTC 调度、保护检查、异常恢复、心跳与日志。 |
-| `competition_strategy.py` / `protected_strategy.py` | 原策略的逐字节副本。 |
-| `backtest.py` 等研究依赖 | 复用原特征口径并保留原策略 CLI 的依赖。 |
-| `STRATEGY_MANIFEST.json` | 原始源码 SHA-256 清单。 |
-| `tests/` | 原策略测试及运行层故障、成交、恢复、特征测试。 |
+| `check` | Read-only: Roostoo server time, all pairs and fresh quotes, closed Binance candles. In `test`/`competition` it also reads balance, pending orders and short positions. Never trades. |
+| `warmup` | Downloads hourly and 15-minute Binance candles for all 21 symbols into `state/candles.sqlite`. Success prints `ready_symbols: 21` and empty `errors`. |
+| `seed` | Optional: imports local 1-minute archives (`--archives data/1m`) instead of downloading full history. |
+| `run` | Continuous loop. `--once` processes one new closed bar and exits; in a live mode it may place orders. |
+| `status` / `export` | Print saved account state, or export the full audit trail as JSONL. |
 
-原研究 `replay` 需要额外的历史 ZIP 文件；在线机器人不需要研究结果 JSON、1 秒回测数据或整个研究数据目录。
+`run --once` processes one new bar boundary in the selected mode. Re-running a boundary that has already been processed never re-sends orders; it waits for the next boundary. On a cold start more than 30 seconds after a bar close, new entries are paused until the next eligible decision window.
 
-## 行情与执行
+## Deploying on AWS EC2 with systemd
 
-- 固定从 `2026-05-01T00:00:00Z` 预热完整小时线，不滚动截断缠论历史；7 日收益需要至少 169 根小时线。15 分钟行情保留最近 14 天。更改预热起点须使用新的状态目录。
-- 小时和 15 分钟 K 线只使用完全收盘的数据；小时历史存在缺口则拒绝该标的的特征。使用原 `chan_structure()` 和 `wyckoff_events()`。
-- UTC 每 15 分钟处理一次；BTC 趋势检查每 4 小时，山寨币排序在 UTC 00:00。停机后的旧交易时点不补下单，恢复已持仓的遗漏收盘峰值。
-- 保护层每约 4 秒读取全市场 Roostoo ticker；余额通常每 30 秒核对，成交后核对。报价采用 API 返回的 `ServerTime`，不以接收时间伪造新鲜度。接口未提供每个盘口单独的更新时间。
-- 所有 Roostoo 尝试，包括重试，通过滚动 60 秒最多 **28 次**的持久化限流器，低于官方 30 次预算。一个状态目录只允许一个执行进程。
-- 先持久化 `SUBMITTING` 再发单。下单 HTTP 只尝试一次；网络超时先查单。订单唯一匹配后恢复，不明确则保留待恢复记录并暂停后续执行。
-- 已知订单按累计成交差额记账；状态、费用和账本原子提交。部分成交不制造虚假平仓或持仓。市场单挂起超过 120 秒尝试撤单一次，再通过查单确认。
-- 无法交易的卖出零头留在账本中并标记 `dust`，继续计入净值和余额核对，不占策略选币槽位。
-- 真实模式首次启动要求账户只有可用 USD、没有历史订单、挂单或空头；已有交易账户必须恢复其原状态目录。余额偏离、未确认订单或策略配置变化会暂停执行。
+The competition instance is a single `t3.medium` in `ap-southeast-2`, reached only through **Session Manager** (no SSH). Run every command below in the Session Manager terminal.
 
-## 状态与审计
+### 1. Install system packages and clone
+
+```bash
+cd ~
+sudo dnf install -y git tmux nano python3.11 python3.11-pip
+git clone https://github.com/EscapedShark/roostoo-bot.git roostoo-bot
+cd ~/roostoo-bot
+git log -1 --oneline
+```
+
+Amazon Linux 2023 ships Python 3.9 as the system Python; NumPy 2.3 needs 3.11+, so use `python3.11` and do not replace the system Python.
+
+### 2. Create the virtual environment and verify
+
+```bash
+python3.11 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m unittest discover -s tests
+.venv/bin/python bot.py check --mode observe
+.venv/bin/python bot.py warmup --mode observe
+```
+
+Warmup downloads several months of hourly history on the first run, which can take a few minutes. The candle cache is shared by all modes, so warming up in `observe` also prepares `competition`.
+
+### 3. Configure the competition key
+
+```bash
+cp .env.example .env
+chmod 600 .env
+nano .env
+```
+
+Set these lines (paste the key and secret yourself; never commit them or put them on the command line):
+
+```dotenv
+BOT_MODE=competition
+ROOSTOO_API_KEY=<competition API key>
+ROOSTOO_SECRET_KEY=<competition API secret>
+STRATEGY_VARIANT=protected
+RANK_EXIT_DAYS=1
+STRUCTURE_EXIT_DAYS=1
+COMPETITION_END_UTC=<organizer-confirmed end time, e.g. YYYY-MM-DDTHH:MM:SS+00:00>
+```
+
+Save with `Ctrl+O`, `Enter`, then exit with `Ctrl+X`.
+
+> **Get `COMPETITION_END_UTC` right before the first start.** It is part of the account fingerprint stored on first launch, together with the key, strategy variant and parameters. Changing any of them later makes the bot refuse to start (`saved account/config fingerprint differs`). The bot stops sending orders at this time; Roostoo performs the final liquidation.
+
+Then run the read-only live check:
+
+```bash
+.venv/bin/python bot.py check --mode competition
+```
+
+It should report `"check": "passed"`, the USD balance, `pending: 0` and `short_positions: 0`. The first live start requires an account holding only free USD with no order history; do not place manual orders on the competition account beforehand.
+
+### 4. Install and start the systemd service
+
+The template uses placeholders. This replaces them with your current user and directory:
+
+```bash
+cd ~/roostoo-bot
+sed -e "s|/home/YOUR_LINUX_USERNAME/roostoo-bot|$PWD|g" -e "s|YOUR_LINUX_USERNAME|$(whoami)|g" \
+  roostoo-bot.service.example | sudo tee /etc/systemd/system/roostoo-bot.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now roostoo-bot
+sudo systemctl status roostoo-bot --no-pager
+```
+
+`enable` starts the bot again after an instance reboot; `Restart=on-failure` restarts it 10 seconds after a crash. A normal exit at `COMPETITION_END_UTC` is not restarted. The mode comes from `BOT_MODE` in `.env`. Do not also start the bot in tmux; a lock file allows only one process per state directory.
+
+### 5. Monitor
+
+```bash
+sudo journalctl -u roostoo-bot -f
+tail -f ~/roostoo-bot/logs/competition.jsonl
+~/roostoo-bot/.venv/bin/python ~/roostoo-bot/bot.py status --mode competition
+```
+
+Press `Ctrl+C` to leave `journalctl -f` or `tail -f`; the service keeps running. Healthy logs show `startup`, then `heartbeat` every minute and `feed_refresh` / `decision` every 15 minutes. `execution_paused` includes its reason. Having no orders is normal: BTC trend checks run at UTC 00/04/08/12/16/20 and altcoin ranking at UTC 00:00.
+
+### 6. Updating code during the competition
+
+```bash
+cd ~/roostoo-bot
+git pull
+sudo systemctl restart roostoo-bot
+```
+
+Keep every strategy or code change as a clear Git commit, as the competition rules require. Do not stop the bot, override decisions or trade manually based on market moves. Never run the same competition key from a second machine.
+
+## Strategy configuration
+
+The defaults are `STRATEGY_VARIANT=protected`, `RANK_EXIT_DAYS=1`, `STRUCTURE_EXIT_DAYS=1`. This keeps the full default protection set of the original `protected_strategy.py`: CPI release guard, 12% account drawdown stop, intrabar stops, and spread and volatility checks for new entries. This differs from the "CPI only" experiment in the research report.
+
+`baseline` uses the original frozen closed-bar signals without the CPI guard, account drawdown stop or intrabar stops. The execution layer still requires trustworthy data, quotes, balances and timely processing. `2/2` is the hysteresis parameter studied in research; this deployment did not re-select parameters based on returns. The configuration and account fingerprint are saved in state and must match on restart.
+
+Capital is split once into a BTC sleeve (20%) and an altcoin sleeve (80%); each sleeve's cash, holdings and fees roll forward independently. A new altcoin position targets 50% of that sleeve's current equity, with at most two tradable holdings; existing positions are not rebalanced. Buy orders reserve 0.5% by default for fees and price movement, and quantities are rounded down, so actual exposure is slightly below the target.
+
+## Modules
+
+| File | Responsibility |
+| --- | --- |
+| `bot.py` / `run.sh` | Entry point and continuous run. |
+| `roostoo_bot/config.py` | Configuration, account and strategy fingerprint; defaults to observe mode. |
+| `roostoo_bot/feed.py` | Closed Binance 1h/15m candles, historical warmup, continuity checks, features. |
+| `roostoo_bot/api.py` | Roostoo signing, server time, public and private endpoints, persistent rate limiter. |
+| `roostoo_bot/store.py` | SQLite sleeves, state, order journal and cumulative fill deltas. |
+| `roostoo_bot/execution.py` | Quantity conversion, sell-before-buy, order recovery, balance reconciliation. |
+| `roostoo_bot/runner.py` | UTC scheduling, protection checks, error recovery, heartbeat and logs. |
+| `competition_strategy.py` / `protected_strategy.py` | Byte-for-byte copies of the original strategy. |
+| `backtest.py` and other research dependencies | Reuse the original feature definitions and keep the original strategy CLI working. |
+| `STRATEGY_MANIFEST.json` | SHA-256 manifest of the original sources. |
+| `tests/` | Original strategy tests plus runtime tests for faults, fills, recovery and features. |
+
+The research `replay` command needs extra historical ZIP files. The live bot does not need research result JSON, 1-second backtest data or the research data directory.
+
+## Market data and execution
+
+- Hourly candles are warmed up from a fixed start, `2026-05-01T00:00:00Z`, without truncating the Chan-theory history; the 7-day return needs at least 169 hourly bars. Fifteen-minute data keeps the most recent 14 days. Changing the warmup start requires a new state directory.
+- Only fully closed hourly and 15-minute candles are used; a gap in hourly history rejects features for that symbol. Features come from the original `chan_structure()` and `wyckoff_events()`.
+- Decisions run every 15 minutes (UTC). BTC trend checks run every 4 hours and altcoin ranking at UTC 00:00. Trade times missed during downtime are not replayed; missed closing peaks of held positions are restored.
+- The protection layer reads the full Roostoo ticker about every 4 seconds; balances are reconciled about every 30 seconds and after fills. Quote freshness uses the API's `ServerTime`, never the local receive time. The API provides no per-book update time.
+- Every Roostoo attempt, including retries, goes through a persistent rolling limiter of at most **28 calls per 60 seconds**, below the official budget of 30. Only one executing process is allowed per state directory.
+- `SUBMITTING` is persisted before an order is sent. An order HTTP request is attempted exactly once; on a network timeout the bot queries orders first. It resumes only on a unique match; otherwise it keeps the record for recovery and pauses further execution.
+- Known orders are booked by cumulative fill deltas; state, fees and ledger are committed atomically. Partial fills never create false closes or positions. A market order still pending after 120 seconds gets one cancel attempt, then is confirmed by query.
+- Unsellable remainders stay in the ledger marked `dust`; they count toward equity and balance reconciliation but do not take a strategy slot.
+- The first live start requires an account with only free USD and no order history, pending orders or shorts. An account that has already traded must restore its original state directory. Balance drift, unconfirmed orders or configuration changes pause execution.
+
+## State and audit
 
 ```bash
 python bot.py status --mode observe
 python bot.py export --mode observe --output logs/observe-audit.jsonl
 ```
 
-`state/observe.sqlite`、`state/test.sqlite`、`state/competition.sqlite` 分别保存状态；`candles.sqlite` 和 `rate_limit.sqlite` 在同一目录共享。真实账户还绑定 API key 哈希指纹，不可通过删除状态重新分配已有资金。
+`state/observe.sqlite`, `state/test.sqlite` and `state/competition.sqlite` hold each mode's state; `candles.sqlite` and `rate_limit.sqlite` are shared in the same directory. Live accounts are also bound to a hash of the API key, so existing capital cannot be re-split by deleting state.
 
-`logs/<模式>.jsonl` 是轮转运行日志。SQLite 的 `events` 是完整成交审计源，包含 UTC 时间、意向理由、标的、方向、成交价与数量、OrderID、API 回报、资金腿和确认状态。使用 `export` 导出；不记录密钥或签名头。
+`logs/<mode>.jsonl` is the rotating runtime log. The SQLite `events` table is the complete trade audit source: UTC time, intent reason, symbol, side, fill price and quantity, OrderID, API response, sleeve and confirmation status. Use `export` to extract it. Keys and signature headers are never logged.
 
-进程运行时备份数据库应使用 SQLite 备份接口；直接复制运行中的 `.sqlite` 可能遗漏 WAL。状态丢失时不能根据当前余额猜测原分账。
+To back up a database while the bot is running, use the SQLite backup API; copying a live `.sqlite` file directly can miss the WAL:
 
-## 验证与限制
+```bash
+.venv/bin/python - <<'PY'
+from pathlib import Path
+import sqlite3
+Path('backups').mkdir(exist_ok=True)
+source = sqlite3.connect('state/competition.sqlite')
+target = sqlite3.connect('backups/competition.sqlite')
+source.backup(target)
+target.close()
+source.close()
+PY
+```
 
-本机验证记录见 [VALIDATION.md](VALIDATION.md)，测试成交记录见 [TEST_RUN_REPORT.md](TEST_RUN_REPORT.md)，真实数据特征对照见 [FEATURE_PARITY.json](FEATURE_PARITY.json)。已验证公开行情、观察运行、General Portfolio 测试账户的小额实际买卖、查单、手续费与余额对账及重启恢复。你已完成 AWS 准备；机器人在 EC2 上的运行尚未核验。
+If state is lost, the original sleeve split cannot be inferred from the current balance.
 
-余额客户端同时兼容实际服务的 `SpotWallet` 和旧文档的 `Wallet`。使用已完成测试的相同密钥在新机器运行，必须恢复其测试状态；Git 拉取源码本身不包含账本。
+## Validation and limitations
 
-UTC 00:00 和每 4 小时的首次冷启动应提前完成预热。主程序刷新行情期间继续处理已持仓的保护检查；行情不完整或处理过晚时不新开仓。长期停机期间无法执行保护卖出；缺少已持仓的遗漏 K 线时暂停后续收盘决策，并继续可用的盘中保护。首次恢复必须保留完整状态和行情缓存。
+Local validation is recorded in [VALIDATION.md](VALIDATION.md), test-account fills in [TEST_RUN_REPORT.md](TEST_RUN_REPORT.md) and real-data feature parity in [FEATURE_PARITY.json](FEATURE_PARITY.json). Verified so far: public market data, observe runs, small real buy and sell orders on the General Portfolio test account, order queries, fee and balance reconciliation, and restart recovery.
 
-正式模式必须配置主办方确认的 `COMPETITION_END_UTC`。到时停止发送订单，由 Roostoo 按官方规则进行最终清仓；时间资料存在冲突，因此示例未猜填日期。原 CPI 日历冻结到 2026-10-14；更晚赛段应在主办方允许的代码更新流程中核对日历。
+The balance client accepts both the live service's `SpotWallet` and the legacy documented `Wallet`. Running an already-used test key on a new machine requires restoring its test state; cloning the source does not include the ledger.
 
-## 官方资料
+Finish warmup before a cold start near UTC 00:00 or the 4-hour checks. While market data refreshes, protection checks for held positions continue; incomplete data or late processing blocks new entries. Protective sells cannot run during long downtime; if missed candles for a held position are unavailable, later closed-bar decisions pause while intrabar protection continues. The first recovery must keep the full state and candle cache.
 
-- [Roostoo API 文档](https://github.com/roostoo/Roostoo-API-Documents)
-- [比赛 FAQ](https://roostoo.notion.site/Roostoo-Quant-Trading-Hackathon-Official-FAQ-313ba22fed798042bab7c93c609d004e)
-- [AWS 登录与启动指南](https://roostoo.notion.site/Hackathon-Guide-How-to-Sign-In-AWS-and-Launch-Your-Bot-309ba22fed798071b4dde6d1e8666816)
-- [Binance K 线接口](https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints)
-- [BLS CPI 发布日历](https://www.bls.gov/schedule/news_release/cpi.htm)
+Competition mode requires the organizer-confirmed `COMPETITION_END_UTC`. The bot stops sending orders at that time and Roostoo liquidates according to the official rules; because published schedules conflict, no date is guessed. The CPI calendar of the original strategy is frozen up to 2026-10-14; later stages should check the calendar through an allowed code update.
+
+## Official references
+
+- [Roostoo API documentation](https://github.com/roostoo/Roostoo-API-Documents)
+- [Competition FAQ](https://roostoo.notion.site/Roostoo-Quant-Trading-Hackathon-Official-FAQ-313ba22fed798042bab7c93c609d004e)
+- [AWS sign-in and launch guide](https://roostoo.notion.site/Hackathon-Guide-How-to-Sign-In-AWS-and-Launch-Your-Bot-309ba22fed798071b4dde6d1e8666816)
+- [Binance kline endpoint](https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints)
+- [BLS CPI release schedule](https://www.bls.gov/schedule/news_release/cpi.htm)
