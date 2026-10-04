@@ -47,7 +47,7 @@ AL2023 的系统 Python 为 3.9，需要单独使用 `python3.11`；不要替换
 
 ```bash
 cd ~
-git clone YOUR_OWN_GITHUB_REPOSITORY_URL roostoo-bot
+git clone https://github.com/EscapedShark/roostoo-bot.git roostoo-bot
 cd ~/roostoo-bot
 git log -1 --oneline
 ```

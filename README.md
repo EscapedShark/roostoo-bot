@@ -1,5 +1,7 @@
 # Roostoo 策略部署版
 
+代码仓库：[EscapedShark/roostoo-bot](https://github.com/EscapedShark/roostoo-bot)。
+
 这是本地研究目录 `策略/roostoo_chan_wyckoff/` 的独立部署版本：保留原始策略，补上在线行情、Roostoo 执行、分账、成交恢复和运行入口。本目录内容就是 GitHub 仓库根目录。上传步骤见 [GITHUB_PUBLISH.md](GITHUB_PUBLISH.md)，固定信号说明见 [STRATEGY.md](STRATEGY.md)，AWS 运行步骤见 [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)。
 
 **默认 `observe`：读取真实公开行情，使用本地模拟资金与模拟成交，不发送交易请求。** `test` 和 `competition` 会使用对应密钥真实调用 Roostoo 模拟交易账户。模式名称无法验证密钥属于哪个比赛阶段，需使用主办方发给该阶段的密钥。

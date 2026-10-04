@@ -1,6 +1,6 @@
 # 上传 GitHub 与继续部署
 
-更新日期：2026-10-05（Australia/Sydney）。本地研究、部署说明、验证记录已核对。本次上传以 `部署/` 为仓库根目录，保留原始策略与完整运行层；GitHub 仓库地址由用户指定。
+更新日期：2026-10-05（Australia/Sydney）。本地研究、部署说明、验证记录已核对。本次上传以 `部署/` 为仓库根目录，保留原始策略与完整运行层；按用户要求新建公开仓库 [EscapedShark/roostoo-bot](https://github.com/EscapedShark/roostoo-bot)。
 
 ## 提交范围
 
@@ -31,10 +31,10 @@ git diff --cached --stat
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-准备好首次提交后，绑定用户指定的仓库，正常推送 `main`：
+准备好首次提交后，绑定目标仓库，正常推送 `main`。若本地 `origin` 已绑定，直接执行最后一行即可：
 
 ```bash
-git remote add origin YOUR_OWN_GITHUB_REPOSITORY_URL
+git remote add origin https://github.com/EscapedShark/roostoo-bot.git
 git push -u origin main
 ```
 
@@ -46,7 +46,7 @@ git push -u origin main
 
 ```bash
 cd ~
-git clone YOUR_OWN_GITHUB_REPOSITORY_URL roostoo-bot
+git clone https://github.com/EscapedShark/roostoo-bot.git roostoo-bot
 cd ~/roostoo-bot
 git log -1 --oneline
 ```
